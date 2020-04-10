@@ -130,8 +130,8 @@ class Errors:
     file = ''  # type: str
 
     # Ignore some errors on these lines of each file
-    # (path -> line -> error-codes)
-    ignored_lines = None  # type: Dict[str, Dict[int, List[str]]]
+    # (path -> line -> (error-codes, expected?))
+    ignored_lines = None  # type: Dict[str, Dict[int, Tuple[List[str], bool]]]
 
     # Lines on which an error was actually ignored.
     used_ignored_lines = None  # type: Dict[str, Set[int]]
@@ -235,7 +235,7 @@ class Errors:
         self.scope = scope
 
     def set_file_ignored_lines(self, file: str,
-                               ignored_lines: Dict[int, List[str]],
+                               ignored_lines: Dict[int, Tuple[List[str], bool]],
                                ignore_all: bool = False) -> None:
         self.ignored_lines[file] = ignored_lines
         if ignore_all:
@@ -349,14 +349,16 @@ class Errors:
             self.only_once_messages.add(info.message)
         self._add_error_info(file, info)
 
-    def is_ignored_error(self, line: int, info: ErrorInfo, ignores: Dict[int, List[str]]) -> bool:
+    def is_ignored_error(self, line: int, info: ErrorInfo,
+                         ignores: Dict[int, Tuple[List[str], bool]]) -> bool:
         if line not in ignores:
             return False
-        elif not ignores[line]:
+        error_codes, _ = ignores[line]
+        if not error_codes:
             # Empty list means that we ignore all errors
             return True
-        elif info.code:
-            return info.code.code in ignores[line]
+        if info.code:
+            return info.code.code in error_codes
         return False
 
     def clear_errors_in_targets(self, path: str, targets: Set[str]) -> None:
@@ -370,15 +372,24 @@ class Errors:
                     self.only_once_messages.remove(info.message)
             self.error_info_map[path] = new_errors
 
-    def generate_unused_ignore_errors(self, file: str) -> None:
+    def generate_unused_ignore_errors(self, file: str, warn_on_all_unused: bool) -> None:
         ignored_lines = self.ignored_lines[file]
         if not is_typeshed_file(file) and file not in self.ignored_files:
             for line in set(ignored_lines) - self.used_ignored_lines[file]:
-                # Don't use report since add_error_info will ignore the error!
-                info = ErrorInfo(self.import_context(), file, self.current_module(), None,
-                                 None, line, -1, 'error', "unused 'type: ignore' comment",
-                                 None, False, False)
-                self._add_error_info(file, info)
+                expected = self.ignored_lines[file][line][1]
+                if expected:
+                    # Don't use report since add_error_info will ignore the error!
+                    info = ErrorInfo(self.import_context(), file, self.current_module(), None,
+                                    None, line, -1,
+                                    'error', "unused 'type: ignore-expected' comment",
+                                    None, False, False)
+                    self._add_error_info(file, info)
+                elif warn_on_all_unused:
+                    # Don't use report since add_error_info will ignore the error!
+                    info = ErrorInfo(self.import_context(), file, self.current_module(), None,
+                                    None, line, -1, 'error', "unused 'type: ignore' comment",
+                                    None, False, False)
+                    self._add_error_info(file, info)
 
     def num_messages(self) -> int:
         """Return the number of generated messages."""

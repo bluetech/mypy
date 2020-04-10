@@ -14,6 +14,7 @@ of redundancy is because the Python 2 AST and the Python 3 AST nodes belong to t
 different class hierarchies, which made it difficult to write a shared visitor between the
 two in a typesafe way.
 """
+import re
 import sys
 import warnings
 
@@ -170,7 +171,8 @@ class ASTConverter:
         # Cache of visit_X methods keyed by type of visited object
         self.visitor_cache = {}  # type: Dict[type, Callable[[Optional[AST]], Any]]
 
-        self.type_ignores = {}  # type: Dict[int, List[str]]
+        # Maps line number to (ignore codes, expected?)
+        self.type_ignores = {}  # type: Dict[int, Tuple[List[str], bool]]
 
     def fail(self, msg: str, line: int, column: int, blocker: bool = True) -> None:
         if blocker or not self.options.ignore_errors:
@@ -344,9 +346,14 @@ class ASTConverter:
     def visit_Module(self, mod: ast27.Module) -> MypyFile:
         self.type_ignores = {}
         for ti in mod.type_ignores:
-            parsed = parse_type_ignore_tag(ti.tag)  # type: ignore[attr-defined]
+            tag = ti.tag  # type: ignore[attr-defined]
+            # TODO: Needs ignore-expected python/typed-ast support.
+            expected = re.match(r'-expected(\s|\[|$)', tag) is not None
+            if expected:
+                tag = tag[9:]
+            parsed = parse_type_ignore_tag(tag)
             if parsed is not None:
-                self.type_ignores[ti.lineno] = parsed
+                self.type_ignores[ti.lineno] = parsed, expected
             else:
                 self.fail(INVALID_TYPE_IGNORE, ti.lineno, -1)
         body = self.fix_function_overloads(self.translate_stmt_list(mod.body, module=True))
@@ -556,12 +563,13 @@ class ASTConverter:
                 typ = converter.visit_raw_str(comment)
                 extra_ignore = TYPE_IGNORE_PATTERN.match(comment)
                 if extra_ignore:
-                    tag = cast(Any, extra_ignore).group(1)  # type: Optional[str]
-                    ignored = parse_type_ignore_tag(tag)
-                    if ignored is None:
-                        self.fail(INVALID_TYPE_IGNORE, converter.line, -1)
+                    expected = cast(Any, extra_ignore).group(1) is not None  # type: bool
+                    tag = cast(Any, extra_ignore).group(2)  # type: Optional[str]
+                    parsed_tag = parse_type_ignore_tag(tag)
+                    if parsed_tag is not None:
+                        self.type_ignores[converter.line] = (parsed_tag, expected)
                     else:
-                        self.type_ignores[converter.line] = ignored
+                        self.fail(INVALID_TYPE_IGNORE, converter.line, -1)
                 return typ
         return None
 

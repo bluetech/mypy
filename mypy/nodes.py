@@ -244,9 +244,11 @@ class MypyFile(SymbolNode):
     # All import nodes within the file (also ones within functions etc.)
     imports = None  # type: List[ImportBase]
     # Lines on which to ignore certain errors when checking.
-    # If the value is empty, ignore all errors; otherwise, the list contains all
-    # error codes to ignore.
-    ignored_lines = None  # type: Dict[int, List[str]]
+    # The first item is a list of error codes to ignore. If the list is empty,
+    # ignore all errors.
+    # The second item is whether the error is expected (i.e. it is an error if
+    # it *isn't* triggered).
+    ignored_lines = None  # type: Dict[int, Tuple[List[str], bool]]
     # Is this file represented by a stub file (.pyi)?
     is_stub = False
     # Is this loaded from the cache and thus missing the actual body of the file?
@@ -262,7 +264,7 @@ class MypyFile(SymbolNode):
                  defs: List[Statement],
                  imports: List['ImportBase'],
                  is_bom: bool = False,
-                 ignored_lines: Optional[Dict[int, List[str]]] = None) -> None:
+                 ignored_lines: Optional[Dict[int, Tuple[List[str], bool]]] = None) -> None:
         super().__init__()
         self.defs = defs
         self.line = 1  # Dummy line number

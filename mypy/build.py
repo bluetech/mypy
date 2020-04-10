@@ -2283,13 +2283,16 @@ class State:
         return [self.dep_line_map.get(dep, 1) for dep in self.dependencies + self.suppressed]
 
     def generate_unused_ignore_notes(self) -> None:
-        if self.options.warn_unused_ignores:
-            # If this file was initially loaded from the cache, it may have suppressed
-            # dependencies due to imports with ignores on them. We need to generate
-            # those errors to avoid spuriously flagging them as unused ignores.
-            if self.meta:
-                self.verify_dependencies(suppressed_only=True)
-            self.manager.errors.generate_unused_ignore_errors(self.xpath)
+        # By default, only unused `type: ignore-expected` directives trigger
+        # an error. The `warn_unused_ignored` option enables the error for
+        # for `type: ignore` directives as well.
+        warn_on_all_unused = self.options.warn_unused_ignores
+        # If this file was initially loaded from the cache, it may have suppressed
+        # dependencies due to imports with ignores on them. We need to generate
+        # those errors to avoid spuriously flagging them as unused ignores.
+        if self.meta:
+            self.verify_dependencies(suppressed_only=True)
+        self.manager.errors.generate_unused_ignore_errors(self.xpath, warn_on_all_unused)
 
 
 # Module import and diagnostic glue

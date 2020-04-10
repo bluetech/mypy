@@ -267,3 +267,24 @@ ERROR # E: Name 'ERROR' is not defined
 
 def f(): ...
 ERROR # E: Name 'ERROR' is not defined
+
+[case testIgnoreExpected]
+1 + 2  # type: ignore
+1 + 2  # type: ignore-expected
+1 + 2  # type: ignore[operator]
+1 + 2  # type: ignore-expected[operator]
+1 + 2  # type: ignore[misc]
+1 + 2  # type: ignore-expected[misc]
+1 + "2"  # type: ignore
+1 + "2"  # type: ignore-expected
+1 + "2"  # type: ignore[operator]
+1 + "2"  # type: ignore-expected[operator]
+1 + "2"  # type: ignore[misc]
+1 + "2"  # type: ignore-expected[misc]
+[out]
+main:2: error: unused 'type: ignore-expected' comment
+main:4: error: unused 'type: ignore-expected' comment
+main:6: error: unused 'type: ignore-expected' comment
+main:11: error: Unsupported operand types for + ("int" and "str")
+main:12: error: unused 'type: ignore-expected' comment
+main:12: error: Unsupported operand types for + ("int" and "str")

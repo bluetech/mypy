@@ -127,7 +127,7 @@ TYPE_COMMENT_SYNTAX_ERROR = 'syntax error in type comment'  # type: Final
 
 INVALID_TYPE_IGNORE = 'Invalid "type: ignore" comment'  # type: Final
 
-TYPE_IGNORE_PATTERN = re.compile(r'[^#]*#\s*type:\s*ignore\s*(.*)')
+TYPE_IGNORE_PATTERN = re.compile(r'[^#]*#\s*type:\s*ignore(-expected)?\s*(.*)')
 
 
 def parse(source: Union[str, bytes],
@@ -199,7 +199,7 @@ def parse_type_comment(type_comment: str,
                        column: int,
                        errors: Optional[Errors],
                        assume_str_is_unicode: bool = True,
-                       ) -> Tuple[Optional[List[str]], Optional[ProperType]]:
+                       ) -> Tuple[Optional[Tuple[List[str], bool]], Optional[ProperType]]:
     """Parse type portion of a type comment (+ optional type ignore).
 
     Return (ignore info, parsed type).
@@ -218,11 +218,15 @@ def parse_type_comment(type_comment: str,
         extra_ignore = TYPE_IGNORE_PATTERN.match(type_comment)
         if extra_ignore:
             # Typeshed has a non-optional return type for group!
-            tag = cast(Any, extra_ignore).group(1)  # type: Optional[str]
-            ignored = parse_type_ignore_tag(tag)  # type: Optional[List[str]]
-            if ignored is None:
+            expected = cast(Any, extra_ignore).group(1) is not None  # type: bool
+            tag = cast(Any, extra_ignore).group(2)  # type: Optional[str]
+            parsed_tag = parse_type_ignore_tag(tag)
+            if parsed_tag is not None:
+                ignored = (parsed_tag, expected)  # type: Optional[Tuple[List[str], bool]]
+            else:
                 if errors is not None:
                     errors.report(line, column, INVALID_TYPE_IGNORE, code=codes.SYNTAX)
+                    ignored = None
                 else:
                     raise SyntaxError
         else:
@@ -288,7 +292,8 @@ class ASTConverter:
         self.is_stub = is_stub
         self.errors = errors
 
-        self.type_ignores = {}  # type: Dict[int, List[str]]
+        # Maps line number to (ignore codes, expected?)
+        self.type_ignores = {}  # type: Dict[int, Tuple[List[str], bool]]
 
         # Cache of visit_X methods keyed by type of visited object
         self.visitor_cache = {}  # type: Dict[type, Callable[[Optional[AST]], Any]]
@@ -475,9 +480,14 @@ class ASTConverter:
     def visit_Module(self, mod: ast3.Module) -> MypyFile:
         self.type_ignores = {}
         for ti in mod.type_ignores:
-            parsed = parse_type_ignore_tag(ti.tag)  # type: ignore[attr-defined]
+            tag = ti.tag  # type: ignore[attr-defined]
+            # TODO: Needs ignore-expected python/typed-ast support.
+            expected = re.match(r'-expected(\s|\[|$)', tag) is not None
+            if expected:
+                tag = tag[9:]
+            parsed = parse_type_ignore_tag(tag)
             if parsed is not None:
-                self.type_ignores[ti.lineno] = parsed
+                self.type_ignores[ti.lineno] = parsed, expected
             else:
                 self.fail(INVALID_TYPE_IGNORE, ti.lineno, -1)
         body = self.fix_function_overloads(self.translate_stmt_list(mod.body, ismodule=True))
