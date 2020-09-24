@@ -239,8 +239,8 @@ def attr_class_maker_callback(ctx: 'mypy.plugin.ClassDefContext',
 
     At a quick glance, the decorator searches the class body for assignments of `attr.ib`s (or
     annotated variables if auto_attribs=True), then depending on how the decorator is called,
-    it will add an __init__ or all the __cmp__ methods.  For frozen=True it will turn the attrs
-    into properties.
+    it will add an __init__ or all the __cmp__ methods.  For frozen=True it will mark the attrs
+    as Final.
 
     See http://www.attrs.org/en/stable/how-does-it-work.html for information on how attrs works.
     """
@@ -599,13 +599,13 @@ def _add_order(ctx: 'mypy.plugin.ClassDefContext', adder: 'MethodAdder') -> None
 
 
 def _make_frozen(ctx: 'mypy.plugin.ClassDefContext', attributes: List[Attribute]) -> None:
-    """Turn all the attributes into properties to simulate frozen classes."""
+    """Mark all the attributes as Final to simulate frozen classes."""
     for attribute in attributes:
         if attribute.name in ctx.cls.info.names:
             # This variable belongs to this class so we can modify it.
             node = ctx.cls.info.names[attribute.name].node
             assert isinstance(node, Var)
-            node.is_property = True
+            node.is_final = True
         else:
             # This variable belongs to a super class so create new Var so we
             # can modify it.
@@ -613,7 +613,7 @@ def _make_frozen(ctx: 'mypy.plugin.ClassDefContext', attributes: List[Attribute]
             var.info = ctx.cls.info
             var._fullname = '%s.%s' % (ctx.cls.info.fullname, var.name)
             ctx.cls.info.names[var.name] = SymbolTableNode(MDEF, var)
-            var.is_property = True
+            var.is_final = True
 
 
 def _add_init(ctx: 'mypy.plugin.ClassDefContext', attributes: List[Attribute],

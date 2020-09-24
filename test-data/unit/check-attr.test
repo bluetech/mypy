@@ -359,7 +359,7 @@ class A:
     a = attr.ib()
 
 a = A(5)
-a.a = 16  # E: Property "a" defined in "A" is read-only
+a.a = 16  # E: Cannot assign to final attribute "a"
 [builtins fixtures/bool.pyi]
 
 [case testAttrsDataClass]
@@ -889,19 +889,19 @@ class NonFrozenFrozen(FrozenBase):
 non_frozen_base = NonFrozenBase(1)
 non_frozen_base.a = 17
 frozen_base = FrozenBase(1)
-frozen_base.a = 17  # E: Property "a" defined in "FrozenBase" is read-only
+frozen_base.a = 17  # E: Cannot assign to final attribute "a"
 
 a = FrozenNonFrozen(1, 2)
-a.a = 17  # E: Property "a" defined in "FrozenNonFrozen" is read-only
-a.b = 17  # E: Property "b" defined in "FrozenNonFrozen" is read-only
+a.a = 17  # E: Cannot assign to final attribute "a"
+a.b = 17  # E: Cannot assign to final attribute "b"
 
 b = FrozenFrozen(1, 2)
-b.a = 17  # E: Property "a" defined in "FrozenFrozen" is read-only
-b.b = 17  # E: Property "b" defined in "FrozenFrozen" is read-only
+b.a = 17  # E: Cannot assign to final attribute "a"
+b.b = 17  # E: Cannot assign to final attribute "b"
 
 c = NonFrozenFrozen(1, 2)
-c.a = 17  # E: Property "a" defined in "NonFrozenFrozen" is read-only
-c.b = 17  # E: Property "b" defined in "NonFrozenFrozen" is read-only
+c.a = 17  # E: Cannot assign to final attribute "a"
+c.b = 17  # E: Cannot assign to final attribute "b"
 
 [builtins fixtures/bool.pyi]
 [case testAttrsCallableAttributes]
@@ -1188,7 +1188,7 @@ import attr
 class C:
     total = attr.ib(type=Bad)  # E: Name 'Bad' is not defined
 
-C(0).total = 1  # E: Property "total" defined in "C" is read-only
+C(0).total = 1  # E: Cannot assign to final attribute "total"
 [builtins fixtures/bool.pyi]
 
 [case testTypeInAttrDeferredStar]
